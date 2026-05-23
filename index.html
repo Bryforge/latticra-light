@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Latticra // Field Engine</title>
+  <meta name="description" content="Latticra field engine: live state lattice, seal hash, terminal narrative, exportable proof manifest." />
+  <style>
+    :root {
+      --bg: #04060d;
+      --bg2: #071424;
+      --ink: #ecfbff;
+      --muted: #8db2c7;
+      --cyan: #4cf5ff;
+      --blue: #3692ff;
+      --violet: #9b66ff;
+      --green: #7cffc7;
+      --amber: #ffd36a;
+      --danger: #ff5f8a;
+      --glass: rgba(8, 20, 36, 0.56);
+      --line: rgba(125, 245, 255, 0.18);
+      --line2: rgba(155, 102, 255, 0.20);
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 50% -10%, rgba(76, 245, 255, 0.14), transparent 35%),
+        radial-gradient(circle at 80% 10%, rgba(155, 102, 255, 0.12), transparent 30%),
+        radial-gradient(circle at 10% 75%, rgba(124, 255, 199, 0.10), transparent 30%),
+        linear-gradient(135deg, var(--bg), var(--bg2) 55%, #02030a);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: -0.01em;
+    }
+
+    #field {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      width: 100vw;
+      height: 100vh;
+      background: transparent;
+    }
+
+    .noise {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      opacity: 0.12;
+      mix-blend-mode: screen;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: radial-gradient(circle at center, black, transparent 82%);
+    }
+
+    .app {
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+      padding: clamp(18px, 3vw, 42px);
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand, .pill, .seal-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      background: rgba(4, 9, 18, 0.55);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 0 42px rgba(76, 245, 255, 0.08);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    .brand b { color: var(--ink); letter-spacing: 0.19em; }
+
+    .orb {
+      width: 13px;
+      height: 13px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 30%, #fff, var(--cyan) 30%, var(--blue) 68%, transparent 70%);
+      box-shadow: 0 0 20px var(--cyan), 0 0 44px rgba(76, 245, 255, 0.45);
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(0.92); opacity: 0.78; }
+      50% { transform: scale(1.2); opacity: 1; }
+    }
+
+    .hero {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: clamp(18px, 3vw, 34px);
+      align-items: end;
+    }
+
+    .hero-copy {
+      padding: clamp(20px, 5vw, 62px) 0 26px;
+    }
+
+    .eyebrow {
+      color: var(--green);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      font-size: clamp(11px, 1.4vw, 13px);
+      margin-bottom: 14px;
+      text-shadow: 0 0 24px rgba(124, 255, 199, 0.45);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(48px, 8vw, 128px);
+      line-height: 0.86;
+      max-width: 9ch;
+      letter-spacing: -0.08em;
+      text-transform: uppercase;
+    }
+
+    .gradient-text {
+      background: linear-gradient(92deg, #fff 0%, var(--cyan) 38%, var(--violet) 72%, #fff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 30px rgba(76, 245, 255, 0.18));
+    }
+
+    .subtitle {
+      margin: 26px 0 0;
+      max-width: 780px;
+      color: #c7e7f6;
+      font-size: clamp(16px, 1.8vw, 21px);
+      line-height: 1.55;
+    }
+
+    .subtitle strong { color: #fff; font-weight: 800; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    button {
+      appearance: none;
+      cursor: pointer;
+      color: var(--ink);
+      border: 1px solid rgba(76, 245, 255, 0.3);
+      background: linear-gradient(180deg, rgba(76, 245, 255, 0.16), rgba(54, 146, 255, 0.08));
+      border-radius: 16px;
+      padding: 13px 16px;
+      font-weight: 800;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+    }
+
+    button:hover { transform: translateY(-2px); border-color: rgba(124, 255, 199, 0.72); }
+    button:active { transform: translateY(1px); }
+    button.secondary { background: rgba(255, 255, 255, 0.055); }
+
+    .panel-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      background: linear-gradient(160deg, rgba(9, 22, 39, 0.72), rgba(8, 9, 22, 0.44));
+      backdrop-filter: blur(22px);
+      border-radius: 28px;
+      padding: clamp(16px, 2.4vw, 24px);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(76, 245, 255, 0.18), transparent 30%),
+        radial-gradient(circle at 95% 40%, rgba(155, 102, 255, 0.11), transparent 28%);
+      opacity: 0.8;
+    }
+
+    .card > * { position: relative; }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      color: #fff;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+
+    .seal-chip {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-transform: none;
+      letter-spacing: 0.04em;
+      color: #dffcff;
+      background: rgba(76, 245, 255, 0.08);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .metric {
+      min-height: 82px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.18);
+      padding: 14px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .metric b {
+      display: block;
+      margin-top: 8px;
+      font-size: clamp(20px, 3.5vw, 34px);
+      letter-spacing: -0.06em;
+    }
+
+    .terminal {
+      min-height: 300px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #c8f8ff;
+      white-space: pre-wrap;
+    }
+
+    .terminal .green { color: var(--green); }
+    .terminal .cyan { color: var(--cyan); }
+    .terminal .violet { color: #c5a8ff; }
+    .terminal .amber { color: var(--amber); }
+
+    .manifest {
+      width: 100%;
+      min-height: 152px;
+      resize: vertical;
+      color: #d7fbff;
+      border: 1px solid rgba(124, 255, 199, 0.22);
+      background: rgba(0, 0, 0, 0.22);
+      border-radius: 18px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      outline: none;
+    }
+
+    .ribbon {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .ribbon .pill {
+      justify-content: center;
+      border-radius: 18px;
+      min-height: 52px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      color: rgba(209, 240, 249, 0.72);
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .kbd {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-bottom-color: rgba(255,255,255,0.28);
+      border-radius: 7px;
+      padding: 2px 6px;
+      background: rgba(255,255,255,0.07);
+      color: #fff;
+    }
+
+    @media (max-width: 960px) {
+      .hero { grid-template-columns: 1fr; align-items: start; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .ribbon { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .topbar { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (max-width: 540px) {
+      .metrics, .ribbon { grid-template-columns: 1fr; }
+      .card-title { align-items: flex-start; flex-direction: column; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="field" aria-hidden="true"></canvas>
+  <div class="noise" aria-hidden="true"></div>
+
+  <main class="app">
+    <header class="topbar">
+      <div class="brand"><i class="orb"></i><b>LATTICRA</b><span>one-pass field engine</span></div>
+      <div class="pill" id="clock">SYNCING LOCAL TIME</div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">single file • no deps • live attestation • state lattice</div>
+        <h1><span class="gradient-text">Field<br>Engine</span></h1>
+        <p class="subtitle">
+          Latticra centerpiece: live <strong>state-lattice visualizer</strong>, deterministic motion core,
+          terminal narrative, and exportable seal manifest. Move the pointer through the field; press stabilize to collapse
+          the lattice into a cleaner proof trace.
+        </p>
+        <div class="actions">
+          <button id="stabilize">Stabilize Field</button>
+          <button id="snapshot" class="secondary">Snapshot Seal</button>
+          <button id="export" class="secondary">Export Proof</button>
+        </div>
+      </div>
+
+      <div class="panel-stack">
+        <article class="card">
+          <div class="card-title">
+            <span>live cryptographic witness</span>
+            <span class="seal-chip" id="seal">calculating seal…</span>
+          </div>
+          <div class="metrics" aria-label="Lattice metrics">
+            <div class="metric"><span>nodes</span><b id="nodes">000</b></div>
+            <div class="metric"><span>edges</span><b id="edges">000</b></div>
+            <div class="metric"><span>entropy</span><b id="entropy">0.00</b></div>
+            <div class="metric"><span>coherence</span><b id="coherence">0%</b></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-title"><span>boot terminal</span><span>press <span class="kbd">S</span> / <span class="kbd">P</span> / <span class="kbd">E</span></span></div>
+          <div class="terminal" id="terminal" role="log" aria-live="polite"></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="ribbon" aria-label="Design claims">
+      <div class="pill">deterministic seed</div>
+      <div class="pill">browser-native canvas</div>
+      <div class="pill">SHA-256 when available</div>
+      <div class="pill">exportable manifest</div>
+    </section>
+
+    <article class="card">
+      <div class="card-title"><span>Latticra proof manifest</span><span id="mode">mode: exploratory</span></div>
+      <textarea class="manifest" id="manifest" spellcheck="false" aria-label="Latticra proof manifest"></textarea>
+    </article>
+
+    <footer class="footer">
+      <span>Latticra // research demo, not a security boundary by itself.</span>
+      <span>one-pass artifact • save as <strong>index.html</strong> • open locally</span>
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const canvas = document.getElementById("field");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      const $ = (id) => document.getElementById(id);
+
+      const state = {
+        seed: 0x4c415454,
+        nodes: [],
+        edges: 0,
+        entropy: 0,
+        coherence: 0,
+        drift: 0,
+        seal: "pending",
+        mode: "exploratory",
+        stabilized: false,
+        snapshots: 0,
+        mouse: { x: 0, y: 0, active: false },
+        t: 0,
+        w: 0,
+        h: 0,
+        dpr: 1
+      };
+
+      function mulberry32(seed) {
+        return function random() {
+          let t = seed += 0x6D2B79F5;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      const random = mulberry32(state.seed);
+
+      function resize() {
+        state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+        state.w = window.innerWidth;
+        state.h = window.innerHeight;
+        canvas.width = Math.floor(state.w * state.dpr);
+        canvas.height = Math.floor(state.h * state.dpr);
+        canvas.style.width = state.w + "px";
+        canvas.style.height = state.h + "px";
+        ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+        seedNodes();
+      }
+
+      function seedNodes() {
+        const target = Math.max(54, Math.min(132, Math.floor((state.w * state.h) / 14500)));
+        state.nodes = Array.from({ length: target }, (_, i) => {
+          const ring = i / target;
+          const a = ring * Math.PI * 2 * 7.0 + random() * 0.8;
+          const r = Math.sqrt(random()) * Math.min(state.w, state.h) * 0.42;
+          return {
+            id: i,
+            x: state.w / 2 + Math.cos(a) * r + (random() - 0.5) * 90,
+            y: state.h / 2 + Math.sin(a) * r + (random() - 0.5) * 90,
+            ox: state.w / 2 + Math.cos(a) * r,
+            oy: state.h / 2 + Math.sin(a) * r,
+            vx: (random() - 0.5) * 0.42,
+            vy: (random() - 0.5) * 0.42,
+            phase: random() * Math.PI * 2,
+            mass: 0.5 + random() * 1.5,
+            glyph: "LATTICRA"[i % 8]
+          };
+        });
+      }
+
+      function line(x1, y1, x2, y2, alpha, width) {
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      function updatePhysics() {
+        const cx = state.w / 2;
+        const cy = state.h / 2;
+        const pull = state.stabilized ? 0.006 : 0.0023;
+        const swirl = state.stabilized ? 0.018 : 0.034;
+        state.drift = 0;
+
+        for (const n of state.nodes) {
+          const dx0 = n.ox - n.x;
+          const dy0 = n.oy - n.y;
+          n.vx += dx0 * pull;
+          n.vy += dy0 * pull;
+
+          const dxC = n.x - cx;
+          const dyC = n.y - cy;
+          const inv = 1 / Math.max(140, Math.hypot(dxC, dyC));
+          n.vx += -dyC * inv * swirl;
+          n.vy += dxC * inv * swirl;
+
+          const wave = Math.sin(state.t * 0.0015 + n.phase);
+          n.vx += Math.cos(n.phase + state.t * 0.0008) * wave * 0.015;
+          n.vy += Math.sin(n.phase + state.t * 0.0008) * wave * 0.015;
+
+          if (state.mouse.active) {
+            const mx = state.mouse.x - n.x;
+            const my = state.mouse.y - n.y;
+            const d = Math.max(44, Math.hypot(mx, my));
+            const force = (state.stabilized ? 48 : 86) / (d * d);
+            n.vx += mx * force / n.mass;
+            n.vy += my * force / n.mass;
+          }
+
+          const damp = state.stabilized ? 0.90 : 0.965;
+          n.vx *= damp;
+          n.vy *= damp;
+          n.x += n.vx;
+          n.y += n.vy;
+
+          if (n.x < -40) n.x = state.w + 40;
+          if (n.x > state.w + 40) n.x = -40;
+          if (n.y < -40) n.y = state.h + 40;
+          if (n.y > state.h + 40) n.y = -40;
+
+          state.drift += Math.hypot(n.vx, n.vy);
+        }
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, state.w, state.h);
+        ctx.fillStyle = "rgba(2, 5, 13, 0.34)";
+        ctx.fillRect(0, 0, state.w, state.h);
+
+        const cx = state.w / 2;
+        const cy = state.h / 2;
+        const radius = Math.min(state.w, state.h) * 0.34;
+
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(state.w, state.h) * 0.64);
+        g.addColorStop(0, "rgba(76,245,255,0.11)");
+        g.addColorStop(0.48, "rgba(54,146,255,0.035)");
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, state.w, state.h);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(state.t * 0.00008);
+        ctx.strokeStyle = "rgba(76,245,255,0.28)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 5; i++) {
+          ctx.globalAlpha = 0.16 - i * 0.018;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, radius + i * 34, (radius + i * 34) * 0.38, i * 0.48, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        state.edges = 0;
+        ctx.strokeStyle = state.stabilized ? "rgba(124,255,199,0.75)" : "rgba(76,245,255,0.72)";
+        const maxDist = state.stabilized ? 166 : 132;
+
+        for (let i = 0; i < state.nodes.length; i++) {
+          const a = state.nodes[i];
+          for (let j = i + 1; j < state.nodes.length; j++) {
+            const b = state.nodes[j];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const d = Math.hypot(dx, dy);
+            if (d < maxDist) {
+              state.edges++;
+              const alpha = (1 - d / maxDist) * (state.stabilized ? 0.38 : 0.23);
+              line(a.x, a.y, b.x, b.y, alpha, state.stabilized ? 1.2 : 0.8);
+            }
+          }
+        }
+
+        for (const n of state.nodes) {
+          const pulse = 0.5 + 0.5 * Math.sin(state.t * 0.0022 + n.phase);
+          const size = state.stabilized ? 2.6 + pulse * 2.8 : 1.8 + pulse * 2.3;
+          const halo = size * (state.stabilized ? 5 : 3.6);
+          const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, halo);
+          grad.addColorStop(0, state.stabilized ? "rgba(255,255,255,0.94)" : "rgba(236,251,255,0.86)");
+          grad.addColorStop(0.28, state.stabilized ? "rgba(124,255,199,0.72)" : "rgba(76,245,255,0.72)");
+          grad.addColorStop(1, "rgba(76,245,255,0)");
+          ctx.globalAlpha = 0.9;
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, halo, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (state.stabilized && n.id % 11 === 0) {
+            ctx.globalAlpha = 0.55;
+            ctx.font = "11px ui-monospace, monospace";
+            ctx.fillStyle = "rgba(236,251,255,0.82)";
+            ctx.fillText(n.glyph, n.x + 7, n.y - 7);
+          }
+        }
+
+        state.entropy = Math.min(9.99, (state.drift / state.nodes.length) * 6.2 + state.edges / Math.max(1, state.nodes.length * 42));
+        state.coherence = Math.max(0, Math.min(100, (state.edges / Math.max(1, state.nodes.length * 5.6)) * 100 - state.entropy * 2.4));
+      }
+
+      function formatNumber(n) {
+        return String(Math.round(n)).padStart(3, "0");
+      }
+
+      function refreshMetrics() {
+        $("nodes").textContent = formatNumber(state.nodes.length);
+        $("edges").textContent = formatNumber(state.edges);
+        $("entropy").textContent = state.entropy.toFixed(2);
+        $("coherence").textContent = Math.round(state.coherence) + "%";
+        $("mode").textContent = "mode: " + state.mode;
+        $("clock").textContent = new Date().toLocaleString(undefined, {
+          weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit"
+        });
+      }
+
+      function snapshotPayload() {
+        const sample = state.nodes.slice(0, 24).map((n) => [
+          n.id,
+          Math.round(n.x * 10) / 10,
+          Math.round(n.y * 10) / 10,
+          Math.round(n.vx * 1000) / 1000,
+          Math.round(n.vy * 1000) / 1000
+        ]);
+        return JSON.stringify({
+          project: "Latticra",
+          artifact: "one-pass-field-engine",
+          mode: state.mode,
+          nodes: state.nodes.length,
+          edges: state.edges,
+          entropy: Number(state.entropy.toFixed(4)),
+          coherence: Number(state.coherence.toFixed(2)),
+          snapshots: state.snapshots,
+          seed: "0x" + state.seed.toString(16),
+          sample
+        });
+      }
+
+      function fallbackHash(input) {
+        let h1 = 0x811c9dc5;
+        let h2 = 0x45d9f3b;
+        for (let i = 0; i < input.length; i++) {
+          const c = input.charCodeAt(i);
+          h1 ^= c;
+          h1 = Math.imul(h1, 0x01000193);
+          h2 ^= c + i;
+          h2 = Math.imul(h2, 0x27d4eb2d);
+        }
+        const left = (h1 >>> 0).toString(16).padStart(8, "0");
+        const right = (h2 >>> 0).toString(16).padStart(8, "0");
+        return (left + right + left.split("").reverse().join("") + right.split("").reverse().join("")).slice(0, 64);
+      }
+
+      async function sha256(input) {
+        if (window.crypto && crypto.subtle && window.TextEncoder) {
+          const bytes = new TextEncoder().encode(input);
+          const digest = await crypto.subtle.digest("SHA-256", bytes);
+          return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+        }
+        return fallbackHash(input);
+      }
+
+      function buildManifest() {
+        return [
+          "LATTICRA FIELD ENGINE",
+          "================================",
+          "artifact: browser demo",
+          "purpose: visual state lattice + exportable witness manifest",
+          "mode: " + state.mode,
+          "seed: 0x" + state.seed.toString(16),
+          "nodes: " + state.nodes.length,
+          "edges: " + state.edges,
+          "entropy: " + state.entropy.toFixed(4),
+          "coherence: " + state.coherence.toFixed(2) + "%",
+          "seal: " + state.seal,
+          "generated: " + new Date().toISOString(),
+          "notes: This is a research/portfolio artifact, not a standalone security boundary.",
+          "run: save as index.html and open in a modern browser."
+        ].join("\n");
+      }
+
+      async function refreshSeal(forceLog = false) {
+        const hash = await sha256(snapshotPayload());
+        state.seal = hash;
+        $("seal").textContent = "seal:" + hash.slice(0, 18) + "…" + hash.slice(-10);
+        $("manifest").value = buildManifest();
+        if (forceLog) pushLine("<span class='cyan'>seal.snapshot</span> " + hash.slice(0, 28) + "…" + hash.slice(-12));
+      }
+
+      const terminal = $("terminal");
+      const boot = [
+        "<span class='green'>latticra.kernel</span> initializing state lattice",
+        "<span class='cyan'>field.seed</span> 0x4c415454 locked",
+        "<span class='violet'>matrix</span> node mesh online",
+        "<span class='green'>seal</span> hashing observable field state",
+        "<span class='amber'>boundary</span> visual artifact only; no false security claims",
+        "<span class='cyan'>ready</span> move pointer / stabilize / export proof"
+      ];
+      let bootIndex = 0;
+
+      function pushLine(html) {
+        const lines = terminal.innerHTML.split("\n").filter(Boolean);
+        lines.push("λ " + html);
+        terminal.innerHTML = lines.slice(-12).join("\n");
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+
+      function bootTick() {
+        if (bootIndex < boot.length) {
+          pushLine(boot[bootIndex++]);
+          window.setTimeout(bootTick, 620);
+        }
+      }
+
+      function stabilize() {
+        state.stabilized = !state.stabilized;
+        state.mode = state.stabilized ? "stabilized-proof-trace" : "exploratory";
+        $("stabilize").textContent = state.stabilized ? "Release Field" : "Stabilize Field";
+        pushLine(state.stabilized
+          ? "<span class='green'>field.stabilize</span> coherence target raised"
+          : "<span class='violet'>field.release</span> exploratory drift restored");
+        refreshSeal(true);
+      }
+
+      function exportProof() {
+        refreshSeal(true).then(() => {
+          const blob = new Blob([$("manifest").value + "\n"], { type: "text/plain;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "latticra-one-pass-proof.txt";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          pushLine("<span class='green'>proof.export</span> latticra-one-pass-proof.txt");
+        });
+      }
+
+      function frame(now) {
+        state.t = now;
+        updatePhysics();
+        render();
+        refreshMetrics();
+        requestAnimationFrame(frame);
+      }
+
+      window.addEventListener("resize", resize, { passive: true });
+      window.addEventListener("pointermove", (event) => {
+        state.mouse.x = event.clientX;
+        state.mouse.y = event.clientY;
+        state.mouse.active = true;
+      }, { passive: true });
+      window.addEventListener("pointerleave", () => { state.mouse.active = false; }, { passive: true });
+
+      $("stabilize").addEventListener("click", stabilize);
+      $("snapshot").addEventListener("click", () => {
+        state.snapshots++;
+        refreshSeal(true);
+      });
+      $("export").addEventListener("click", exportProof);
+
+      window.addEventListener("keydown", (event) => {
+        if (event.key.toLowerCase() === "s") stabilize();
+        if (event.key.toLowerCase() === "p") { state.snapshots++; refreshSeal(true); }
+        if (event.key.toLowerCase() === "e") exportProof();
+      });
+
+      resize();
+      bootTick();
+      refreshSeal();
+      window.setInterval(() => refreshSeal(), 1800);
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
